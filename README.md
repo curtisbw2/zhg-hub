@@ -28,3 +28,5 @@ delete_note, set_queue_paused, plus the original asset tools.
 Posting to X uses the official API (OAuth 1.0a, pay-per-use). Substack blocks
 server-originated requests, so Substack halves post through a logged-in browser
 via the bookmarklet at the bottom of the Notes page.
+
+<!-- pipeline: 2026-07-14T18:44:03Z -->
