@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZHG Data Hub</title>
+<style>
+  :root {
+    --accent: #FF6B00;
+    --bg: #000000;
+    --panel: #111111;
+    --border: #2a2a2a;
+    --text: #ffffff;
+    --muted: #999999;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    padding: 40px 20px;
+  }
+  .container { max-width: 720px; margin: 0 auto; }
+  header { margin-bottom: 32px; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+  header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  header h1 span { color: var(--accent); }
+  header p { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  .nav-btn {
+    display: inline-block;
+    background: var(--accent);
+    color: #000;
+    border-radius: 6px;
+    padding: 10px 16px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-decoration: none;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+  }
+  .nav-btn:hover { opacity: 0.85; }
+
+  .dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 8px;
+    padding: 48px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    background: var(--panel);
+  }
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--accent);
+    background: #1a120a;
+  }
+  .dropzone .dz-icon { font-size: 28px; margin-bottom: 8px; }
+  .dropzone .dz-main { font-size: 15px; }
+  .dropzone .dz-main strong { color: var(--accent); }
+  .dropzone .dz-sub { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .dropzone.has-file { border-style: solid; border-color: var(--accent); }
+  #fileInput { display: none; }
+
+  .fields {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 18px;
+  }
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field.full { grid-column: 1 / -1; }
+  label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  input[type="text"], select {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 10px 12px;
+    font-size: 14px;
+    outline: none;
+    width: 100%;
+  }
+  input[type="text"]:focus, select:focus { border-color: var(--accent); }
+
+  button#uploadBtn {
+    margin-top: 20px;
+    width: 100%;
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    padding: 13px;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  button#uploadBtn:hover { opacity: 0.85; }
+  button#uploadBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  #status { margin-top: 16px; font-size: 14px; min-height: 20px; }
+  #status.ok { color: #4ade80; }
+  #status.err { color: #f87171; }
+  #status.busy { color: var(--accent); }
+
+  .progress {
+    margin-top: 10px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+    display: none;
+  }
+  .progress.active { display: block; }
+  .progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    transition: width 0.2s;
+  }
+
+  section.recent { margin-top: 48px; }
+  section.recent h2 {
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 10px;
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th {
+    text-align: left;
+    color: var(--muted);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 11px;
+    letter-spacing: 1px;
+    padding: 8px 10px;
+  }
+  td { padding: 10px; border-top: 1px solid var(--border); }
+  td.fname { color: var(--text); font-weight: 500; word-break: break-all; }
+  td .folder-badge {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+  }
+  td.tags, td.date { color: var(--muted); }
+  .empty { color: var(--muted); font-size: 13px; padding: 16px 10px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <div>
+      <h1>ZHG <span>Data Hub</span></h1>
+      <p>Internal upload — Zero Hour Group</p>
+    </div>
+    <a class="nav-btn" href="/review.html">Notes &rarr;</a>
+  </header>
+
+  <div class="dropzone" id="dropzone">
+    <div class="dz-icon">&#8679;</div>
+    <div class="dz-main" id="dzMain">Drag &amp; drop a file here, or <strong>browse</strong></div>
+    <div class="dz-sub" id="dzSub">Any file type</div>
+    <input type="file" id="fileInput">
+  </div>
+
+  <div class="fields">
+    <div class="field">
+      <label for="folder">Destination folder</label>
+      <select id="folder">
+        <option value="media">media</option>
+        <option value="docs">docs</option>
+        <option value="pipeline">pipeline</option>
+        <option value="structured">structured</option>
+      </select>
+    </div>
+    <div class="field">
+      <label for="uploadedBy">Uploaded by (optional)</label>
+      <input type="text" id="uploadedBy" placeholder="Your name">
+    </div>
+    <div class="field full">
+      <label for="tags">Tags (comma-separated)</label>
+      <input type="text" id="tags" placeholder="e.g. interview, q3, thumbnail">
+    </div>
+  </div>
+
+  <button id="uploadBtn">Upload</button>
+  <div class="progress" id="progress"><div class="progress-bar" id="progressBar"></div></div>
+  <div id="status"></div>
+
+  <section class="recent">
+    <h2>Recent uploads</h2>
+    <table>
+      <thead>
+        <tr><th>Filename</th><th>Folder</th><th>Tags</th><th>Uploaded</th></tr>
+      </thead>
+      <tbody id="recentBody">
+        <tr><td colspan="4" class="empty">Loading&hellip;</td></tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<script>
+(function () {
+  const dropzone = document.getElementById("dropzone");
+  const fileInput = document.getElementById("fileInput");
+  const dzMain = document.getElementById("dzMain");
+  const dzSub = document.getElementById("dzSub");
+  const uploadBtn = document.getElementById("uploadBtn");
+  const statusEl = document.getElementById("status");
+  const progress = document.getElementById("progress");
+  const progressBar = document.getElementById("progressBar");
+  const recentBody = document.getElementById("recentBody");
+
+  let selectedFile = null;
+
+  function setStatus(msg, cls) {
+    statusEl.textContent = msg;
+    statusEl.className = cls || "";
+  }
+
+  function formatSize(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  function setFile(file) {
+    selectedFile = file;
+    dropzone.classList.add("has-file");
+    dzMain.innerHTML = "";
+    dzMain.textContent = file.name;
+    dzSub.textContent = formatSize(file.size) + " — ready to upload";
+    setStatus("", "");
+  }
+
+  // Dropzone interactions
+  dropzone.addEventListener("click", () => fileInput.click());
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files.length) setFile(fileInput.files[0]);
+  });
+  ["dragenter", "dragover"].forEach((ev) =>
+    dropzone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      dropzone.classList.add("dragover");
+    })
+  );
+  ["dragleave", "drop"].forEach((ev) =>
+    dropzone.addEventListener(ev, (e) => {
+      e.preventDefault();
+      dropzone.classList.remove("dragover");
+    })
+  );
+  dropzone.addEventListener("drop", (e) => {
+    if (e.dataTransfer.files.length) setFile(e.dataTransfer.files[0]);
+  });
+
+  // Coarse asset type from MIME
+  function typeFromMime(mime) {
+    if (!mime) return "other";
+    if (mime.startsWith("image/")) return "image";
+    if (mime.startsWith("video/")) return "video";
+    if (mime.startsWith("audio/")) return "audio";
+    if (mime === "application/json" || mime === "text/csv" || mime.includes("spreadsheet") || mime.includes("excel")) return "data";
+    if (mime.startsWith("text/") || mime === "application/pdf" || mime.includes("document") || mime.includes("word")) return "doc";
+    return "other";
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",")[1]);
+      reader.onerror = () => reject(new Error("Could not read file"));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function upload() {
+    if (!selectedFile) {
+      setStatus("Pick a file first.", "err");
+      return;
+    }
+    uploadBtn.disabled = true;
+    progress.classList.add("active");
+    progressBar.style.width = "0%";
+    setStatus("Reading file…", "busy");
+
+    try {
+      const file_base64 = await fileToBase64(selectedFile);
+      const payload = {
+        tool: "upload_file",
+        params: {
+          filename: selectedFile.name,
+          folder: document.getElementById("folder").value,
+          type: typeFromMime(selectedFile.type),
+          tags: document.getElementById("tags").value.trim(),
+          uploaded_by: document.getElementById("uploadedBy").value.trim(),
+          file_base64: file_base64,
+          content_type: selectedFile.type || "application/octet-stream"
+        }
+      };
+
+      setStatus("Uploading…", "busy");
+      const result = await new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/mcp");
+        xhr.setRequestHeader("Content-Type", "application/json");
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            progressBar.style.width = Math.round((e.loaded / e.total) * 100) + "%";
+          }
+        };
+        xhr.onload = () => {
+          let data = {};
+          try { data = JSON.parse(xhr.responseText); } catch (_) {}
+          if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+          else reject(new Error(data.error || "Upload failed (HTTP " + xhr.status + ")"));
+        };
+        xhr.onerror = () => reject(new Error("Network error"));
+        xhr.send(JSON.stringify(payload));
+      });
+
+      progressBar.style.width = "100%";
+      setStatus("Uploaded ✓  " + result.r2_key + " (id " + result.id + ")", "ok");
+      selectedFile = null;
+      fileInput.value = "";
+      dropzone.classList.remove("has-file");
+      dzMain.innerHTML = 'Drag &amp; drop a file here, or <strong>browse</strong>';
+      dzSub.textContent = "Any file type";
+      loadRecent();
+    } catch (err) {
+      setStatus("Error: " + err.message, "err");
+    } finally {
+      uploadBtn.disabled = false;
+      setTimeout(() => progress.classList.remove("active"), 600);
+    }
+  }
+
+  uploadBtn.addEventListener("click", upload);
+
+  function esc(s) {
+    const d = document.createElement("div");
+    d.textContent = s == null ? "" : String(s);
+    return d.innerHTML;
+  }
+
+  async function loadRecent() {
+    try {
+      const res = await fetch("/mcp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tool: "list_recent", params: { limit: 15 } })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to load");
+
+      if (!data.results || data.results.length === 0) {
+        recentBody.innerHTML = '<tr><td colspan="4" class="empty">Nothing uploaded yet.</td></tr>';
+        return;
+      }
+      recentBody.innerHTML = data.results
+        .map((r) => {
+          const date = r.uploaded_at ? new Date(r.uploaded_at).toLocaleString() : "";
+          return (
+            "<tr>" +
+            '<td class="fname">' + esc(r.filename) + "</td>" +
+            '<td><span class="folder-badge">' + esc(r.folder) + "</span></td>" +
+            '<td class="tags">' + esc(r.tags) + "</td>" +
+            '<td class="date">' + esc(date) + "</td>" +
+            "</tr>"
+          );
+        })
+        .join("");
+    } catch (err) {
+      recentBody.innerHTML = '<tr><td colspan="4" class="empty">Could not load recent uploads: ' + esc(err.message) + "</td></tr>";
+    }
+  }
+
+  loadRecent();
+})();
+</script>
+</body>
+</html>

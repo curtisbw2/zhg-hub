@@ -1,0 +1,23 @@
+name = "zhg-hub-worker"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "public"
+
+[ai]
+binding = "AI"
+
+[[vectorize]]
+binding = "ZHG_VECTORS"
+index_name = "zhg-hub-vectors"
+
+[[r2_buckets]]
+binding = "ZHG_BUCKET"
+bucket_name = "zhg-data-hub"
+
+[[d1_databases]]
+binding = "ZHG_DB"
+database_name = "zhg-hub-db"
+database_id = "c8ed4025-b64e-4c06-8544-53d1fd7b5786"

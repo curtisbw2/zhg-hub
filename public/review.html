@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZHG Notes</title>
+<style>
+  :root {
+    --accent: #FF6B00;
+    --bg: #000000;
+    --panel: #111111;
+    --border: #2a2a2a;
+    --text: #ffffff;
+    --muted: #999999;
+    --ok: #4ade80;
+    --err: #f87171;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    padding: 32px 16px;
+  }
+  .container { max-width: 720px; margin: 0 auto; }
+  header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; gap: 12px; flex-wrap: wrap; }
+  header h1 { font-size: 20px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; }
+  header h1 span { color: var(--accent); }
+
+  .pause {
+    display: flex; align-items: center; gap: 8px;
+    font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted);
+    cursor: pointer; user-select: none;
+    border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; background: var(--panel);
+  }
+  .pause.paused { border-color: var(--err); color: var(--err); }
+
+  .tabs { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+  .tabs button {
+    background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+    border-radius: 6px; padding: 8px 14px; font-size: 12px; text-transform: uppercase;
+    letter-spacing: 1px; cursor: pointer;
+  }
+  .tabs button.active { border-color: var(--accent); color: var(--accent); }
+  .tabs button .count { opacity: 0.8; }
+
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 16px; margin-bottom: 14px;
+  }
+  .card .meta {
+    display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap;
+    font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px;
+    margin-bottom: 10px;
+  }
+  .card .meta .status-posted { color: var(--ok); }
+  .card .meta .status-failed, .card .meta .status-rejected { color: var(--err); }
+  .card .meta .status-approved { color: var(--accent); }
+  .card-when { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 8px; }
+  .card-when span { color: var(--muted); font-weight: 400; }
+  textarea {
+    width: 100%; background: #0a0a0a; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 12px 14px; font-size: 15px; line-height: 1.5; font-family: inherit;
+    resize: vertical; min-height: 170px; outline: none;
+  }
+  details .variant textarea { min-height: 110px; }
+  textarea:focus { border-color: var(--accent); }
+  textarea[readonly] { opacity: 0.7; }
+  .counter { font-size: 11px; color: var(--muted); margin-top: 4px; text-align: right; }
+  .counter.over { color: var(--err); font-weight: 700; }
+
+  details { margin-top: 8px; }
+  details summary { font-size: 11px; color: var(--muted); cursor: pointer; text-transform: uppercase; letter-spacing: 1px; }
+  details .variant { margin-top: 8px; }
+  details .variant label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+
+  .controls { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+  .platforms { display: flex; gap: 10px; font-size: 12px; color: var(--muted); }
+  .platforms label { display: flex; align-items: center; gap: 4px; cursor: pointer; }
+  input[type="datetime-local"] {
+    background: #0a0a0a; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 8px 10px; font-size: 12px; outline: none;
+  }
+  .actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .actions button {
+    border: none; border-radius: 6px; padding: 10px 18px; font-size: 12px; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
+  }
+  .btn-approve { background: var(--accent); color: #000; }
+  .btn-save { background: transparent; color: var(--text); border: 1px solid var(--border) !important; }
+  .btn-reject { background: transparent; color: var(--err); border: 1px solid var(--err) !important; }
+  .actions button:hover { opacity: 0.85; }
+  .actions button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .error-line { color: var(--err); font-size: 12px; margin-top: 8px; word-break: break-word; }
+  .posted-links { font-size: 12px; margin-top: 8px; }
+  .posted-links a { color: var(--accent); }
+
+  .card-status { font-size: 13px; margin-top: 10px; min-height: 16px; }
+  .card-status.ok { color: var(--ok); }
+  .card-status.err { color: var(--err); }
+  .card-status.busy { color: var(--accent); }
+
+  .ai-panel {
+    margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px;
+  }
+  .ai-panel .ai-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+  .ai-log { font-size: 12px; color: var(--muted); margin-bottom: 8px; max-height: 120px; overflow-y: auto; }
+  .ai-log .ai-you { color: var(--text); }
+  .ai-log .ai-bot { color: var(--accent); }
+  .ai-log div { margin-bottom: 4px; }
+  .ai-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ai-row input {
+    flex: 1; min-width: 200px; background: #0a0a0a; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 10px 12px; font-size: 13px; outline: none;
+  }
+  .ai-row input:focus { border-color: var(--accent); }
+  .ai-row button {
+    background: transparent; color: var(--accent); border: 1px solid var(--accent);
+    border-radius: 6px; padding: 10px 14px; font-size: 11px; font-weight: 700;
+    letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
+  }
+  .ai-row button:hover { opacity: 0.85; }
+  .ai-row button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .composer-toggle {
+    width: 100%; background: transparent; border: 2px dashed var(--border); color: var(--muted);
+    border-radius: 8px; padding: 14px; font-size: 13px; cursor: pointer; margin-bottom: 18px;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .composer-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+  #globalStatus { font-size: 13px; min-height: 18px; margin-bottom: 14px; }
+  #globalStatus.ok { color: var(--ok); }
+  #globalStatus.err { color: var(--err); }
+  .empty { color: var(--muted); font-size: 14px; text-align: center; padding: 32px 0; }
+
+  #tokenGate {
+    max-width: 380px; margin: 80px auto; text-align: center;
+  }
+  #tokenGate input {
+    width: 100%; background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--text); padding: 12px; font-size: 14px; outline: none; margin: 14px 0;
+  }
+  #tokenGate button {
+    width: 100%; background: var(--accent); color: #000; border: none; border-radius: 6px;
+    padding: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; cursor: pointer;
+  }
+</style>
+</head>
+<body>
+
+<div id="tokenGate" style="display:none">
+  <h1 style="font-size:18px;letter-spacing:2px;text-transform:uppercase">ZHG <span style="color:var(--accent)">Notes</span></h1>
+  <input id="tokenInput" type="password" placeholder="Review token" autocomplete="off">
+  <button onclick="saveToken()">Enter</button>
+  <p id="tokenErr" style="color:var(--err);font-size:12px;margin-top:10px"></p>
+</div>
+
+<div class="container" id="app" style="display:none">
+  <header>
+    <div>
+      <a href="/" style="color:var(--muted);font-size:11px;text-decoration:none;text-transform:uppercase;letter-spacing:1px">&larr; Data Hub</a>
+      <h1 style="margin-top:4px">ZHG <span>Notes</span></h1>
+    </div>
+    <div class="pause" id="pauseToggle" onclick="togglePause()">
+      <span id="pauseLabel">...</span>
+    </div>
+  </header>
+
+  <div id="globalStatus"></div>
+
+  <button class="composer-toggle" onclick="toggleComposer()">+ New note</button>
+  <div class="card" id="composer" style="display:none">
+    <div class="meta"><span>New draft</span></div>
+    <textarea id="newBody" placeholder="Note text (default for all platforms)" oninput="updateCounter(this, 'newCounter')"></textarea>
+    <div class="counter" id="newCounter">0 / 280 on X</div>
+    <div class="controls">
+      <div class="platforms">
+        <label><input type="checkbox" id="newPx" checked> X</label>
+        <label><input type="checkbox" id="newPs" checked> Substack</label>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn-approve" onclick="createNote()">Add draft</button>
+    </div>
+  </div>
+
+  <div class="tabs" id="tabs"></div>
+  <div id="list"></div>
+
+  <div class="card" style="margin-top:28px">
+    <div class="meta"><span>Substack poster (bookmarklet)</span></div>
+    <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:10px">
+      Substack blocks posting from servers, so Substack halves post through your own browser.
+      Drag the button below to your bookmarks bar once. Then, whenever a note says
+      "Substack pending": open substack.com (logged in) and click the bookmark. It posts
+      every pending Substack note and reports back to this queue.
+    </p>
+    <a href="javascript:(async()=>{if(location.hostname!=='substack.com'){alert('Open substack.com first, then click this bookmark.');return;}const HUB='https://zhg-hub-worker.zerohourgroup.workers.dev/mcp';let T=localStorage.getItem('zhg_queue_token')||prompt('ZHG queue token:');if(!T)return;localStorage.setItem('zhg_queue_token',T);const rpc=(tool,params)=>fetch(HUB,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:tool,params:params})}).then(r=>r.json());const q=await rpc('get_queue',{status:'failed'});const pend=(q.results||[]).filter(n=>n.platforms.includes('substack')&&!(n.post_urls&&JSON.parse(n.post_urls).substack));if(!pend.length){alert('No pending Substack notes.');return;}if(!confirm('Post '+pend.length+' note(s) to Substack now?\n\n'+pend.map(n=>'#'+n.id+': '+n.body.slice(0,60)).join('\n')))return;let done=0,fail=0,msgs=[];for(const n of pend){const text=n.body_substack||n.body;const bodyJson={type:'doc',attrs:{schemaVersion:'v1'},content:text.split(/\n+/).map(p=>p.trim()).filter(Boolean).map(p=>({type:'paragraph',content:[{type:'text',text:p}]}))};try{const r=await fetch('https://substack.com/api/v1/comment/feed',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({bodyJson:bodyJson,tabId:'for-you',surface:'feed',replyMinimumRole:'everyone'})});const d=await r.json();if(!r.ok||!d.id)throw new Error('HTTP '+r.status);const h=d.user&&d.user.handle?'@'+d.user.handle+'/':'';const url='https://substack.com/'+h+'note/c-'+d.id;const m=await rpc('mark_posted',{token:T,id:n.id,platform:'substack',url:url});if(m.error)throw new Error(m.error);done++;msgs.push('#'+n.id+' posted');}catch(e){fail++;msgs.push('#'+n.id+' FAILED: '+e.message);}}alert('Done. '+done+' posted, '+fail+' failed.\n'+msgs.join('\n'));})();"
+       class="btn-save" style="display:inline-block;text-decoration:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:10px 18px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase"
+       onclick="alert('Drag this button to your bookmarks bar instead of clicking it here.');return false;">ZHG &rarr; Substack</a>
+  </div>
+</div>
+
+<script>
+// Direct-post mode: approve/reject flow is disabled server-side (review_note is
+// commented out in the worker). Flip to true when the review pipeline returns.
+const REVIEW_ENABLED = false;
+
+const TABS = REVIEW_ENABLED
+  ? ["draft", "approved", "posted", "failed", "rejected"]
+  : ["draft", "posted", "failed"];
+let currentTab = "draft";
+let paused = false;
+
+const token = () => localStorage.getItem("zhg_queue_token") || "";
+const reviewer = () => {
+  let r = localStorage.getItem("zhg_reviewer");
+  if (!r) {
+    r = (prompt("Your name (for the review log):", "jt") || "jt").trim().toLowerCase();
+    localStorage.setItem("zhg_reviewer", r);
+  }
+  return r;
+};
+
+async function call(tool, params = {}) {
+  const res = await fetch("/mcp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tool, params })
+  });
+  const data = await res.json();
+  if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+function setStatus(msg, cls = "") {
+  const el = document.getElementById("globalStatus");
+  el.textContent = msg;
+  el.className = cls;
+  if (msg) setTimeout(() => { if (el.textContent === msg) { el.textContent = ""; el.className = ""; } }, 5000);
+}
+
+// X counts URLs as 23 chars
+function xLen(text) {
+  return [...text.replace(/https?:\/\/\S+/g, "x".repeat(23))].length;
+}
+function updateCounter(ta, counterId) {
+  const el = document.getElementById(counterId);
+  const n = xLen(ta.value);
+  el.textContent = `${n} / 280 on X`;
+  el.classList.toggle("over", n > 280);
+}
+
+function esc(s) {
+  return (s || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+function fmtLocal(iso) {
+  if (!iso) return "";
+  try { return new Date(iso).toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); }
+  catch { return iso; }
+}
+
+function fmtFull(iso) {
+  if (!iso) return "";
+  try { return new Date(iso).toLocaleString([], { weekday: "short", year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); }
+  catch { return iso; }
+}
+
+function cardHeading(n) {
+  if (n.status === "posted" && n.posted_at) return `Posted <span>·</span> ${fmtFull(n.posted_at)}`;
+  if (n.status === "failed") return `Drafted ${fmtFull(n.created_at)} <span>· post attempt failed</span>`;
+  return `Drafted <span>·</span> ${fmtFull(n.created_at)}`;
+}
+
+async function load() {
+  let data;
+  try { data = await call("get_queue", { limit: 200 }); }
+  catch (e) { setStatus(`Load failed: ${e.message}`, "err"); return; }
+
+  paused = data.paused;
+  const pl = document.getElementById("pauseLabel");
+  pl.textContent = paused ? "Posting paused - tap to resume" : "Posting live - tap to pause";
+  document.getElementById("pauseToggle").classList.toggle("paused", paused);
+
+  const byStatus = {};
+  TABS.forEach((t) => (byStatus[t] = []));
+  data.results.forEach((n) => (byStatus[n.status] || (byStatus[n.status] = [])).push(n));
+
+  document.getElementById("tabs").innerHTML = TABS.map((t) =>
+    `<button class="${t === currentTab ? "active" : ""}" onclick="switchTab('${t}')">${t} <span class="count">(${byStatus[t].length})</span></button>`
+  ).join("");
+
+  const notes = byStatus[currentTab] || [];
+  const list = document.getElementById("list");
+  if (!notes.length) {
+    list.innerHTML = `<div class="empty">No ${currentTab} notes</div>`;
+    return;
+  }
+  list.innerHTML = notes.map(renderCard).join("");
+  notes.forEach((n) => {
+    const ta = document.getElementById(`body-${n.id}`);
+    if (ta && !ta.readOnly) updateCounter(ta, `counter-${n.id}`);
+  });
+}
+
+function renderCard(n) {
+  const editable = ["draft", "approved", "failed"].includes(n.status);
+  const ro = editable ? "" : "readonly";
+  let urls = "";
+  if (n.post_urls) {
+    try {
+      const u = JSON.parse(n.post_urls);
+      urls = `<div class="posted-links">${Object.entries(u).map(([p, url]) => `<a href="${esc(url)}" target="_blank">${p}</a>`).join(" · ")}</div>`;
+    } catch {}
+  }
+  return `
+  <div class="card" id="card-${n.id}">
+    <div class="meta">
+      <span>#${n.id} · ${esc(n.platforms)} · by ${esc(n.created_by || "?")}</span>
+      <span class="status-${n.status}">${n.status}${n.scheduled_at ? " · " + fmtLocal(n.scheduled_at) : ""}</span>
+    </div>
+    <div class="card-when">${cardHeading(n)}</div>
+    <textarea id="body-${n.id}" ${ro} oninput="updateCounter(this, 'counter-${n.id}')">${esc(n.body)}</textarea>
+    <div class="counter" id="counter-${n.id}"></div>
+    ${editable ? `
+    <details ${n.body_x || n.body_substack ? "open" : ""}>
+      <summary>Per-platform variants (optional)</summary>
+      <div class="variant"><label>X variant</label><textarea id="bx-${n.id}" placeholder="Leave blank to use main text">${esc(n.body_x || "")}</textarea></div>
+      <div class="variant"><label>Substack variant</label><textarea id="bs-${n.id}" placeholder="Leave blank to use main text">${esc(n.body_substack || "")}</textarea></div>
+    </details>
+    <div class="controls">
+      <div class="platforms">
+        <label><input type="checkbox" id="px-${n.id}" ${n.platforms.includes("x") ? "checked" : ""}> X</label>
+        <label><input type="checkbox" id="ps-${n.id}" ${n.platforms.includes("substack") ? "checked" : ""}> Substack</label>
+      </div>
+      ${REVIEW_ENABLED ? `<input type="datetime-local" id="sched-${n.id}" title="Post time (blank = next cron run)">` : ""}
+    </div>
+    <div class="ai-panel">
+      <div class="ai-title">AI rewrite</div>
+      <div class="ai-log" id="ailog-${n.id}"></div>
+      <div class="ai-row">
+        <input id="aiin-${n.id}" placeholder="How should it change? Leave blank for a full regenerate." onkeydown="if(event.key==='Enter')aiRewrite(${n.id})">
+        <button id="aibtn-${n.id}" onclick="aiRewrite(${n.id})">Rewrite</button>
+        <button onclick="aiUndo(${n.id})">Undo</button>
+      </div>
+    </div>
+    <div class="actions">
+      ${REVIEW_ENABLED && n.status !== "approved" ? `<button class="btn-approve" onclick="review(${n.id}, 'approve')">Approve</button>` : ""}
+      ${!REVIEW_ENABLED ? (paused
+        ? `<button class="btn-approve" disabled title="Unpause posting with the toggle at the top">Paused</button>`
+        : `<button class="btn-approve" onclick="postNow(${n.id})">${n.status === "failed" ? "Retry" : "Post now"}</button>`) : ""}
+      <button class="btn-save" onclick="save(${n.id})">Save edits</button>
+      ${REVIEW_ENABLED ? `<button class="btn-reject" onclick="review(${n.id}, 'reject')">Reject</button>` : ""}
+      <button class="btn-reject" onclick="delNote(${n.id})">Delete</button>
+    </div>
+    <div class="card-status" id="cstat-${n.id}"></div>` : ""}
+    ${n.error ? `<div class="error-line">${esc(n.error)}</div>` : ""}
+    ${urls}
+    ${!editable ? `
+    <div class="actions">
+      <button class="btn-reject" onclick="delNote(${n.id})">Delete</button>
+    </div>
+    <div class="card-status" id="cstat-${n.id}"></div>` : ""}
+  </div>`;
+}
+
+function collectEdits(id) {
+  const platforms = [
+    document.getElementById(`px-${id}`).checked ? "x" : null,
+    document.getElementById(`ps-${id}`).checked ? "substack" : null
+  ].filter(Boolean).join(",");
+  if (!platforms) throw new Error("Pick at least one platform");
+  const sched = document.getElementById(`sched-${id}`)?.value;
+  return {
+    body: document.getElementById(`body-${id}`).value,
+    body_x: document.getElementById(`bx-${id}`).value || "",
+    body_substack: document.getElementById(`bs-${id}`).value || "",
+    platforms,
+    ...(sched ? { scheduled_at: new Date(sched).toISOString() } : {})
+  };
+}
+
+function setCardStatus(id, msg, cls = "") {
+  const el = document.getElementById(`cstat-${id}`);
+  if (!el) { setStatus(msg, cls); return; }
+  el.textContent = msg;
+  el.className = `card-status ${cls}`;
+}
+
+async function save(id) {
+  try {
+    await call("update_note", { token: token(), id, ...collectEdits(id) });
+    setCardStatus(id, `Saved`, "ok");
+  } catch (e) { setCardStatus(id, e.message, "err"); }
+}
+
+async function postNow(id) {
+  if (!confirm(`Post note #${id} to its platforms now? This goes live immediately.`)) return;
+  setCardStatus(id, "Posting...", "busy");
+  try {
+    await call("update_note", { token: token(), id, ...collectEdits(id) });
+    const res = await call("post_note", { token: token(), id });
+    if (res.errors) {
+      const posted = Object.keys(res.post_urls || {}).map((p) => `${p} posted`).join(", ");
+      let msg = (posted ? posted + ". " : "") + "Failed: " + Object.keys(res.errors).join(", ") + ".";
+      if (res.errors.substack) msg += " Substack posts from your browser: open substack.com and click the ZHG bookmarklet (see bottom of this page).";
+      setStatus(msg, "err");
+      load();
+      return;
+    }
+    const links = Object.values(res.post_urls || {}).join("  ");
+    setStatus(`Note #${id} posted. ${links}`, "ok");
+    load();
+  } catch (e) {
+    setCardStatus(id, e.message, "err");
+  }
+}
+
+// --- AI rewrite ---
+const aiUndoStack = {};
+
+function aiLog(id, who, msg) {
+  const log = document.getElementById(`ailog-${id}`);
+  if (!log) return;
+  const d = document.createElement("div");
+  d.className = who === "you" ? "ai-you" : "ai-bot";
+  d.textContent = (who === "you" ? "You: " : "AI: ") + msg;
+  log.appendChild(d);
+  log.scrollTop = log.scrollHeight;
+}
+
+async function aiRewrite(id) {
+  const btn = document.getElementById(`aibtn-${id}`);
+  const input = document.getElementById(`aiin-${id}`);
+  const bodyEl = document.getElementById(`body-${id}`);
+  const bxEl = document.getElementById(`bx-${id}`);
+  const instruction = (input.value || "").trim();
+
+  aiLog(id, "you", instruction || "(full regenerate)");
+  btn.disabled = true;
+  btn.textContent = "...";
+  try {
+    const res = await call("rewrite_note", {
+      token: token(),
+      body: bodyEl.value,
+      body_x: bxEl ? bxEl.value : "",
+      instruction
+    });
+    (aiUndoStack[id] = aiUndoStack[id] || []).push({ body: bodyEl.value, body_x: bxEl ? bxEl.value : "" });
+    bodyEl.value = res.body;
+    if (bxEl && res.body_x && res.body_x !== res.body) bxEl.value = res.body_x;
+    else if (bxEl && res.body_x === res.body) bxEl.value = "";
+    updateCounter(bodyEl, `counter-${id}`);
+    input.value = "";
+    aiLog(id, "bot", "Rewritten. Review the text, then Save edits or Post now. Undo restores the previous version.");
+  } catch (e) {
+    aiLog(id, "bot", `Failed: ${e.message}`);
+  }
+  btn.disabled = false;
+  btn.textContent = "Rewrite";
+}
+
+function aiUndo(id) {
+  const prev = (aiUndoStack[id] || []).pop();
+  if (!prev) { aiLog(id, "bot", "Nothing to undo."); return; }
+  const bodyEl = document.getElementById(`body-${id}`);
+  const bxEl = document.getElementById(`bx-${id}`);
+  bodyEl.value = prev.body;
+  if (bxEl) bxEl.value = prev.body_x;
+  updateCounter(bodyEl, `counter-${id}`);
+  aiLog(id, "bot", "Restored previous version.");
+}
+
+async function review(id, action) {
+  try {
+    if (action === "approve") {
+      await call("update_note", { token: token(), id, ...collectEdits(id) });
+    }
+    const sched = document.getElementById(`sched-${id}`)?.value;
+    await call("review_note", {
+      token: token(), id, action, reviewed_by: reviewer(),
+      ...(action === "approve" && sched ? { scheduled_at: new Date(sched).toISOString() } : {})
+    });
+    setStatus(`Note #${id} ${action}d`, "ok");
+    load();
+  } catch (e) { setStatus(e.message, "err"); }
+}
+
+async function delNote(id) {
+  if (!confirm(`Delete note #${id} from the queue? This only removes the queue record; any live posts stay up.`)) return;
+  try {
+    await call("delete_note", { token: token(), id });
+    setStatus(`Note #${id} deleted`, "ok");
+    load();
+  } catch (e) { setCardStatus(id, e.message, "err"); }
+}
+
+async function togglePause() {
+  try {
+    await call("set_queue_paused", { token: token(), paused: !paused });
+    load();
+  } catch (e) { setStatus(e.message, "err"); }
+}
+
+function toggleComposer() {
+  const c = document.getElementById("composer");
+  c.style.display = c.style.display === "none" ? "block" : "none";
+}
+
+async function createNote() {
+  const body = document.getElementById("newBody").value.trim();
+  if (!body) { setStatus("Note text is empty", "err"); return; }
+  const platforms = [
+    document.getElementById("newPx").checked ? "x" : null,
+    document.getElementById("newPs").checked ? "substack" : null
+  ].filter(Boolean).join(",");
+  try {
+    await call("queue_note", { body, platforms, created_by: reviewer() });
+    document.getElementById("newBody").value = "";
+    toggleComposer();
+    setStatus("Draft added", "ok");
+    load();
+  } catch (e) { setStatus(e.message, "err"); }
+}
+
+function switchTab(t) { currentTab = t; load(); }
+
+async function saveToken() {
+  const t = document.getElementById("tokenInput").value.trim();
+  if (!t) return;
+  localStorage.setItem("zhg_queue_token", t);
+  // Validate the token with a side-effect-free gated call: a valid token on a
+  // nonexistent id returns "No note found", an invalid token returns 401.
+  try {
+    await call("update_note", { token: t, id: 0, topic: "token-check" });
+    location.reload();
+  } catch (e) {
+    if (/No note found/i.test(e.message)) { location.reload(); return; }
+    localStorage.removeItem("zhg_queue_token");
+    document.getElementById("tokenErr").textContent = e.message;
+  }
+}
+
+(function init() {
+  const urlToken = new URLSearchParams(location.search).get("token");
+  if (urlToken) {
+    localStorage.setItem("zhg_queue_token", urlToken);
+    history.replaceState(null, "", location.pathname);
+  }
+  if (!token()) {
+    document.getElementById("tokenGate").style.display = "block";
+    return;
+  }
+  document.getElementById("app").style.display = "block";
+  load();
+  setInterval(load, 60000);
+})();
+</script>
+</body>
+</html>
