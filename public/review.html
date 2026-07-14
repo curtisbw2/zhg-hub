@@ -164,9 +164,6 @@
       <a href="/" style="color:var(--muted);font-size:11px;text-decoration:none;text-transform:uppercase;letter-spacing:1px">&larr; Data Hub</a>
       <h1 style="margin-top:4px">ZHG <span>Notes</span></h1>
     </div>
-    <div class="pause" id="pauseToggle" onclick="togglePause()">
-      <span id="pauseLabel">...</span>
-    </div>
   </header>
 
   <div id="globalStatus"></div>
@@ -290,9 +287,6 @@ async function load() {
   catch (e) { setStatus(`Load failed: ${e.message}`, "err"); return; }
 
   paused = data.paused;
-  const pl = document.getElementById("pauseLabel");
-  pl.textContent = paused ? "Posting paused - tap to resume" : "Posting live - tap to pause";
-  document.getElementById("pauseToggle").classList.toggle("paused", paused);
 
   const byStatus = {};
   TABS.forEach((t) => (byStatus[t] = []));
@@ -358,9 +352,7 @@ function renderCard(n) {
     </div>
     <div class="actions">
       ${REVIEW_ENABLED && n.status !== "approved" ? `<button class="btn-approve" onclick="review(${n.id}, 'approve')">Approve</button>` : ""}
-      ${!REVIEW_ENABLED ? (paused
-        ? `<button class="btn-approve" disabled title="Unpause posting with the toggle at the top">Paused</button>`
-        : `<button class="btn-approve" onclick="postNow(${n.id})">${n.status === "failed" ? "Retry" : "Post now"}</button>`) : ""}
+      ${!REVIEW_ENABLED ? `<button class="btn-approve" onclick="postNow(${n.id})">${n.status === "failed" ? "Retry" : "Post now"}</button>` : ""}
       <button class="btn-save" onclick="save(${n.id})">Save edits</button>
       ${REVIEW_ENABLED ? `<button class="btn-reject" onclick="review(${n.id}, 'reject')">Reject</button>` : ""}
       <button class="btn-reject" onclick="delNote(${n.id})">Delete</button>
@@ -513,13 +505,6 @@ async function delNote(id) {
     setStatus(`Note #${id} deleted`, "ok");
     load();
   } catch (e) { setCardStatus(id, e.message, "err"); }
-}
-
-async function togglePause() {
-  try {
-    await call("set_queue_paused", { token: token(), paused: !paused });
-    load();
-  } catch (e) { setStatus(e.message, "err"); }
 }
 
 function toggleComposer() {
