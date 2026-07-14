@@ -1238,6 +1238,10 @@ export default {
     const url = new URL(request.url);
     const toolCtx = { origin: url.origin, waitUntil: ctx?.waitUntil?.bind(ctx) };
 
+    if (url.pathname === "/review.html") {
+      return Response.redirect(`${url.origin}/notes`, 301);
+    }
+
     if (request.method === "GET" && (url.pathname === "/" || url.pathname === "/health")) {
       return json({ status: "ZHG Hub online" });
     }
