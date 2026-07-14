@@ -22,3 +22,6 @@ bucket_name = "zhg-data-hub"
 binding = "ZHG_DB"
 database_name = "zhg-hub-db"
 database_id = "c8ed4025-b64e-4c06-8544-53d1fd7b5786"
+
+[triggers]
+crons = ["*/5 * * * *"]

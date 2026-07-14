@@ -408,8 +408,8 @@ async function queueNote(env, params, toolCtx) {
 
 async function getQueue(env, params) {
   const { status, limit = 50 } = params;
-  if (status && !["draft", "approved", "rejected", "posted", "failed"].includes(status)) {
-    const err = new Error("status must be one of: draft, approved, rejected, posted, failed");
+  if (status && !["draft", "scheduled", "approved", "rejected", "posted", "failed"].includes(status)) {
+    const err = new Error("status must be one of: draft, scheduled, approved, rejected, posted, failed");
     err.status = 400;
     throw err;
   }
@@ -728,6 +728,93 @@ async function postToSubstack(env, text) {
   return `https://substack.com/${handle}note/c-${data.id}`;
 }
 
+// Scheduling helpers. post_urls holds either a real published URL for a
+// platform, or a "scheduled:<ISO>" handoff marker (Substack native scheduler).
+function isRealUrl(v) { return typeof v === "string" && v.length > 0 && !v.startsWith("scheduled:"); }
+
+function platformsFrom(note) { return note.platforms.split(",").filter(Boolean); }
+
+function allPlatformsHandled(note, urls) {
+  return platformsFrom(note).every((p) => urls[p]); // real url OR scheduled: marker
+}
+
+async function scheduleNote(env, params, toolCtx) {
+  requireQueueToken(env, params);
+  requireParams(params, ["id", "scheduled_at"]);
+  const { id, scheduled_at } = params;
+
+  const when = new Date(scheduled_at);
+  if (isNaN(when.getTime())) { const e = new Error("scheduled_at must be a valid ISO 8601 timestamp"); e.status = 400; throw e; }
+  if (when.getTime() < Date.now() - 60000) { const e = new Error("scheduled_at is in the past"); e.status = 400; throw e; }
+
+  const note = await env.ZHG_DB.prepare("SELECT * FROM notes_queue WHERE id = ?").bind(id).first();
+  if (!note) { const e = new Error(`No note found with id ${id}`); e.status = 404; throw e; }
+  if (!["draft", "scheduled", "failed"].includes(note.status)) {
+    const e = new Error(`Cannot schedule a note with status '${note.status}'`); e.status = 400; throw e;
+  }
+  if (note.platforms.includes("x")) validateXLength(note);
+
+  const row = await env.ZHG_DB.prepare(
+    `UPDATE notes_queue SET status = 'scheduled', scheduled_at = ?, error = NULL WHERE id = ? RETURNING *`
+  ).bind(when.toISOString(), id).first();
+  return { id: row.id, status: row.status, scheduled_at: row.scheduled_at, platforms: row.platforms };
+}
+
+async function markScheduled(env, params) {
+  requireQueueToken(env, params);
+  requireParams(params, ["id", "platform", "trigger_at"]);
+  const { id, platform, trigger_at } = params;
+  if (!NOTE_PLATFORMS.includes(platform)) { const e = new Error(`platform must be one of: ${NOTE_PLATFORMS.join(", ")}`); e.status = 400; throw e; }
+
+  const note = await env.ZHG_DB.prepare("SELECT * FROM notes_queue WHERE id = ?").bind(id).first();
+  if (!note) { const e = new Error(`No note found with id ${id}`); e.status = 404; throw e; }
+
+  const urls = note.post_urls ? JSON.parse(note.post_urls) : {};
+  urls[platform] = `scheduled:${trigger_at}`;
+
+  const xTargeted = note.platforms.includes("x");
+  const xReal = isRealUrl(urls.x);
+  const done = allPlatformsHandled(note, urls) && (!xTargeted || xReal);
+  const status = done ? "posted" : "scheduled";
+  const posted_at = done ? new Date().toISOString() : null;
+
+  const row = await env.ZHG_DB.prepare(
+    `UPDATE notes_queue SET post_urls = ?, status = ?, posted_at = COALESCE(?, posted_at) WHERE id = ? RETURNING *`
+  ).bind(JSON.stringify(urls), status, posted_at, id).first();
+  return { id: row.id, status: row.status, post_urls: JSON.parse(row.post_urls) };
+}
+
+// Cron: publish scheduled X posts whose time has arrived. Substack is handled
+// by its own native scheduler (via the bookmarklet), never here.
+async function runDueScheduled(env, toolCtx) {
+  if ((await getSetting(env, "posting_paused", "0")) === "1") return { skipped: "paused" };
+  const now = new Date().toISOString();
+  const { results } = await env.ZHG_DB.prepare(
+    "SELECT * FROM notes_queue WHERE status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= ?"
+  ).bind(now).all();
+
+  let posted = 0, failed = 0;
+  for (const note of results) {
+    const urls = note.post_urls ? JSON.parse(note.post_urls) : {};
+    if (!note.platforms.includes("x") || isRealUrl(urls.x)) continue;
+    try {
+      urls.x = await postToX(env, note.body_x || note.body);
+      const done = allPlatformsHandled(note, urls);
+      await env.ZHG_DB.prepare(
+        `UPDATE notes_queue SET post_urls = ?, status = ?, posted_at = COALESCE(?, posted_at), error = NULL WHERE id = ?`
+      ).bind(JSON.stringify(urls), done ? "posted" : "scheduled", done ? now : null, note.id).run();
+      posted++;
+      if (done) notifyDiscord(env, toolCtx, `\u{1F680} Scheduled note #${note.id} posted to X\n${urls.x}`);
+    } catch (e) {
+      await env.ZHG_DB.prepare("UPDATE notes_queue SET status = 'failed', error = ? WHERE id = ?")
+        .bind(JSON.stringify({ x: e.message }), note.id).run();
+      failed++;
+      notifyDiscord(env, toolCtx, `\u{274C} Scheduled note #${note.id} FAILED on X: ${e.message}`);
+    }
+  }
+  return { checked: results.length, posted, failed };
+}
+
 async function postNote(env, params, toolCtx) {
   requireQueueToken(env, params);
   requireParams(params, ["id"]);
@@ -913,11 +1000,11 @@ const TOOLS = {
   },
   get_queue: {
     description:
-      "List notes in the ZHG posting queue, newest first, with the global posting_paused flag. Optionally filter by status: draft, approved, rejected, posted, failed.",
+      "List notes in the ZHG posting queue, newest first, with the global posting_paused flag. Optionally filter by status: draft, scheduled, approved, rejected, posted, failed.",
     inputSchema: {
       type: "object",
       properties: {
-        status: { type: "string", enum: ["draft", "approved", "rejected", "posted", "failed"], description: "Optional status filter" },
+        status: { type: "string", enum: ["draft", "scheduled", "approved", "rejected", "posted", "failed"], description: "Optional status filter" },
         limit: { type: "number", description: "Max results (default 50, max 200)" }
       }
     },
@@ -1004,6 +1091,35 @@ const TOOLS = {
       required: ["token", "body"]
     },
     handler: rewriteNote
+  },
+  schedule_note: {
+    description:
+      "Schedule a queued ZHG note to publish at a future time. Requires the queue review token. Sets status to 'scheduled' and stores scheduled_at (ISO 8601). X posts fire automatically via the worker cron at that time; Substack notes must additionally be handed to Substack's native scheduler via the browser bookmarklet.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        token: { type: "string", description: "Queue review token" },
+        id: { type: "number", description: "Queue row id" },
+        scheduled_at: { type: "string", description: "ISO 8601 UTC time to publish at" }
+      },
+      required: ["token", "id", "scheduled_at"]
+    },
+    handler: scheduleNote
+  },
+  mark_scheduled: {
+    description:
+      "Record that a platform was handed to its native scheduler outside the worker (Substack via the bookmarklet). Requires the queue review token. Stores a 'scheduled:<trigger_at>' marker in post_urls for that platform. Flips the note to 'posted' once every platform is handled and any X target has a real URL.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        token: { type: "string", description: "Queue review token" },
+        id: { type: "number", description: "Queue row id" },
+        platform: { type: "string", enum: ["x", "substack"], description: "Platform handed to its scheduler" },
+        trigger_at: { type: "string", description: "ISO 8601 UTC time it will publish" }
+      },
+      required: ["token", "id", "platform", "trigger_at"]
+    },
+    handler: markScheduled
   },
   post_note: {
     description:
@@ -1112,6 +1228,12 @@ async function handleLegacy(env, body, toolCtx) {
 }
 
 export default {
+  // Cloudflare Cron Trigger: fire scheduled X posts whose time has arrived.
+  async scheduled(event, env, ctx) {
+    const toolCtx = { waitUntil: ctx?.waitUntil?.bind(ctx) };
+    ctx.waitUntil(runDueScheduled(env, toolCtx));
+  },
+
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const toolCtx = { origin: url.origin, waitUntil: ctx?.waitUntil?.bind(ctx) };

@@ -90,6 +90,13 @@
   .btn-approve { background: var(--accent); color: #000; }
   .btn-save { background: transparent; color: var(--text); border: 1px solid var(--border) !important; }
   .btn-reject { background: transparent; color: var(--err); border: 1px solid var(--err) !important; }
+  .schedule-row { display: flex; gap: 8px; align-items: center; margin-top: 10px; flex-wrap: wrap; }
+  .schedule-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .schedule-row input[type="datetime-local"] { background: #0a0a0a; border: 1px solid var(--border); border-radius: 6px; color: var(--text); padding: 8px 10px; font-size: 12px; outline: none; }
+  .schedule-row input[type="datetime-local"]:focus { border-color: var(--accent); }
+  .btn-schedule { background: transparent; color: var(--accent); border: 1px solid var(--accent); border-radius: 6px; padding: 9px 16px; font-size: 12px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; cursor: pointer; }
+  .btn-schedule:hover { opacity: 0.85; }
+  .status-scheduled { color: var(--accent); }
   .actions button:hover { opacity: 0.85; }
   .actions button:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -193,10 +200,10 @@
       Substack blocks posting from servers, so Substack halves post through your own browser.
       <strong style="color:var(--text)">Setup (once):</strong> press Ctrl+Shift+B to show the bookmarks bar, then drag the button below onto it.
       <br><br>
-      <strong style="color:var(--text)">Use:</strong> after clicking Post now on a note, a Substack tab opens automatically.
-      Click the bookmark there and a panel appears listing every note awaiting Substack. Tick the ones you want and post them.
+      <strong style="color:var(--text)">Use:</strong> after you Post now or Schedule a note, a Substack tab opens automatically.
+      Click the bookmark there and a panel lists every Substack note waiting: post-now notes publish immediately, scheduled notes go into Substack’s own scheduler for their time. Tick the ones you want and send.
     </p>
-    <a href="javascript:(async()=>{const HUB='https://zhg-hub-worker.zerohourgroup.workers.dev/mcp';if(location.hostname.indexOf('substack.com')===-1){alert('Open substack.com (logged in) first, then click this bookmark.');return;}if(document.getElementById('zhgPanel')){document.getElementById('zhgPanel').remove();}let T=localStorage.getItem('zhg_queue_token')||prompt('ZHG queue token:');if(!T)return;localStorage.setItem('zhg_queue_token',T);const rpc=(t,p)=>fetch(HUB,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:t,params:p})}).then(r=>r.json());const q=await rpc('get_queue',{limit:200});const pend=(q.results||[]).filter(n=>{if(n.platforms.indexOf('substack')===-1)return false;if(n.status!=='failed')return false;let u={};try{u=n.post_urls?JSON.parse(n.post_urls):{};}catch(e){}return !u.substack;});const P=document.createElement('div');P.id='zhgPanel';P.style.cssText='position:fixed;top:20px;right:20px;width:400px;max-height:75vh;overflow-y:auto;background:#111;border:1px solid #FF6B00;border-radius:8px;color:#fff;padding:16px;z-index:999999;font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:13px;box-shadow:0 8px 32px rgba(0,0,0,.6)';const H=document.createElement('div');H.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px';const HT=document.createElement('div');HT.textContent='ZHG - Substack';HT.style.cssText='font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#FF6B00;font-size:12px';const HX=document.createElement('div');HX.textContent='X';HX.style.cssText='cursor:pointer;color:#999;font-size:12px';HX.onclick=()=>P.remove();H.appendChild(HT);H.appendChild(HX);P.appendChild(H);if(!pend.length){const E=document.createElement('div');E.textContent='No notes awaiting Substack. Click Post now on the ZHG Notes page first.';E.style.cssText='color:#999;line-height:1.5';P.appendChild(E);document.body.appendChild(P);return;}const boxes=[];pend.forEach(n=>{const row=document.createElement('label');row.style.cssText='display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid #2a2a2a;border-radius:6px;margin-bottom:8px;cursor:pointer;line-height:1.45';const cb=document.createElement('input');cb.type='checkbox';cb.checked=true;cb.style.cssText='margin-top:3px;flex-shrink:0';const tx=document.createElement('div');const id=document.createElement('div');id.textContent='#'+n.id;id.style.cssText='color:#FF6B00;font-weight:700;font-size:11px;margin-bottom:3px';const bd=document.createElement('div');bd.textContent=(n.body_substack||n.body).slice(0,150)+((n.body_substack||n.body).length>150?'...':'');const st=document.createElement('div');st.style.cssText='margin-top:5px;font-size:11px;color:#999';tx.appendChild(id);tx.appendChild(bd);tx.appendChild(st);row.appendChild(cb);row.appendChild(tx);P.appendChild(row);boxes.push({n:n,cb:cb,st:st});});const B=document.createElement('button');B.textContent='Post selected to Substack';B.style.cssText='width:100%;background:#FF6B00;color:#000;border:none;border-radius:6px;padding:12px;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:4px';B.onclick=async()=>{const sel=boxes.filter(b=>b.cb.checked);if(!sel.length){alert('Nothing selected.');return;}B.disabled=true;B.textContent='Posting...';for(const b of sel){b.st.textContent='Posting...';b.st.style.color='#FF6B00';const text=b.n.body_substack||b.n.body;const bodyJson={type:'doc',attrs:{schemaVersion:'v1'},content:text.split(/\n+/).map(p=>p.trim()).filter(Boolean).map(p=>({type:'paragraph',content:[{type:'text',text:p}]}))};try{const r=await fetch('https://substack.com/api/v1/comment/feed',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({bodyJson:bodyJson,tabId:'for-you',surface:'feed',replyMinimumRole:'everyone'})});const d=await r.json();if(!r.ok||!d.id)throw new Error('Substack HTTP '+r.status);const prof=d.user&amp;&amp;d.user.id&amp;&amp;d.user.name?'profile/'+d.user.id+'-'+d.user.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'/':'';const url='https://substack.com/'+prof+'note/c-'+d.id;const m=await rpc('mark_posted',{token:T,id:b.n.id,platform:'substack',url:url});if(m.error)throw new Error(m.error);b.st.textContent='Posted';b.st.style.color='#4ade80';b.cb.checked=false;b.cb.disabled=true;}catch(e){b.st.textContent='Failed: '+e.message;b.st.style.color='#f87171';}}B.disabled=false;B.textContent='Post selected to Substack';};P.appendChild(B);document.body.appendChild(P);})();"
+    <a href="javascript:(async()=>{const HUB='https://zhg-hub-worker.zerohourgroup.workers.dev/mcp';if(location.hostname.indexOf('substack.com')===-1){alert('Open substack.com (logged in) first, then click this bookmark.');return;}if(document.getElementById('zhgPanel')){document.getElementById('zhgPanel').remove();}let T=localStorage.getItem('zhg_queue_token')||prompt('ZHG queue token:');if(!T)return;localStorage.setItem('zhg_queue_token',T);const rpc=(t,p)=>fetch(HUB,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:t,params:p})}).then(r=>r.json());const mkBody=(text)=>({type:'doc',attrs:{schemaVersion:'v1'},content:text.split(/\n+/).map(p=>p.trim()).filter(Boolean).map(p=>({type:'paragraph',content:[{type:'text',text:p}]}))});const q=await rpc('get_queue',{limit:200});const pend=(q.results||[]).filter(n=>{if(n.platforms.indexOf('substack')===-1)return false;let u={};try{u=n.post_urls?JSON.parse(n.post_urls):{};}catch(e){}if(u.substack)return false;return n.status==='failed'||n.status==='scheduled';});const P=document.createElement('div');P.id='zhgPanel';P.style.cssText='position:fixed;top:20px;right:20px;width:410px;max-height:80vh;overflow-y:auto;background:#111;border:1px solid #FF6B00;border-radius:8px;color:#fff;padding:16px;z-index:999999;font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:13px;box-shadow:0 8px 32px rgba(0,0,0,.6)';const H=document.createElement('div');H.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px';const HT=document.createElement('div');HT.textContent='ZHG - Substack';HT.style.cssText='font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#FF6B00;font-size:12px';const HX=document.createElement('div');HX.textContent='X';HX.style.cssText='cursor:pointer;color:#999;font-size:12px';HX.onclick=()=>P.remove();H.appendChild(HT);H.appendChild(HX);P.appendChild(H);if(!pend.length){const E=document.createElement('div');E.textContent='No Substack notes waiting. Post or schedule a note on the ZHG Notes page first.';E.style.cssText='color:#999;line-height:1.5';P.appendChild(E);document.body.appendChild(P);return;}const boxes=[];pend.forEach(n=>{const sched=(n.status==='scheduled'&amp;&amp;n.scheduled_at)?n.scheduled_at:null;const row=document.createElement('label');row.style.cssText='display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid #2a2a2a;border-radius:6px;margin-bottom:8px;cursor:pointer;line-height:1.45';const cb=document.createElement('input');cb.type='checkbox';cb.checked=true;cb.style.cssText='margin-top:3px;flex-shrink:0';const tx=document.createElement('div');const id=document.createElement('div');id.textContent='#'+n.id+(sched?(' - schedules for '+new Date(sched).toLocaleString()):' - post now');id.style.cssText='color:#FF6B00;font-weight:700;font-size:11px;margin-bottom:3px';const bd=document.createElement('div');const txt=n.body_substack||n.body;bd.textContent=txt.slice(0,150)+(txt.length>150?'...':'');const st=document.createElement('div');st.style.cssText='margin-top:5px;font-size:11px;color:#999';tx.appendChild(id);tx.appendChild(bd);tx.appendChild(st);row.appendChild(cb);row.appendChild(tx);P.appendChild(row);boxes.push({n:n,cb:cb,st:st,sched:sched});});const B=document.createElement('button');B.textContent='Send selected to Substack';B.style.cssText='width:100%;background:#FF6B00;color:#000;border:none;border-radius:6px;padding:12px;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:4px';B.onclick=async()=>{const sel=boxes.filter(b=>b.cb.checked);if(!sel.length){alert('Nothing selected.');return;}B.disabled=true;B.textContent='Working...';for(const b of sel){const text=b.n.body_substack||b.n.body;const bodyJson=mkBody(text);try{if(b.sched){b.st.textContent='Scheduling...';b.st.style.color='#FF6B00';const r=await fetch('https://substack.com/api/v1/comment/draft',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({bodyJson:bodyJson,tabId:'for-you',surface:'feed',replyMinimumRole:'everyone',trigger_at:b.sched})});const d=await r.json();if(!r.ok||!d.id)throw new Error('Substack HTTP '+r.status);const m=await rpc('mark_scheduled',{token:T,id:b.n.id,platform:'substack',trigger_at:b.sched});if(m.error)throw new Error(m.error);b.st.textContent='Scheduled on Substack';b.st.style.color='#4ade80';}else{b.st.textContent='Posting...';b.st.style.color='#FF6B00';const r=await fetch('https://substack.com/api/v1/comment/feed',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({bodyJson:bodyJson,tabId:'for-you',surface:'feed',replyMinimumRole:'everyone'})});const d=await r.json();if(!r.ok||!d.id)throw new Error('Substack HTTP '+r.status);const prof=d.user&amp;&amp;d.user.id&amp;&amp;d.user.name?'profile/'+d.user.id+'-'+d.user.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'/':'';const url='https://substack.com/'+prof+'note/c-'+d.id;const m=await rpc('mark_posted',{token:T,id:b.n.id,platform:'substack',url:url});if(m.error)throw new Error(m.error);b.st.textContent='Posted';b.st.style.color='#4ade80';}b.cb.checked=false;b.cb.disabled=true;}catch(e){b.st.textContent='Failed: '+e.message;b.st.style.color='#f87171';}}B.disabled=false;B.textContent='Send selected to Substack';};P.appendChild(B);document.body.appendChild(P);})();"
        class="btn-save" style="display:inline-block;text-decoration:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:10px 18px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase"
        onclick="alert(String.fromCharCode(68,114,97,103) + ' this button to your bookmarks bar instead of clicking it here.');return false;">ZHG &rarr; Substack</a>
     <div style="margin-top:16px">
@@ -216,7 +223,7 @@ const REVIEW_ENABLED = false;
 
 const TABS = REVIEW_ENABLED
   ? ["draft", "approved", "posted", "failed", "rejected"]
-  : ["draft", "posted", "failed"];
+  : ["draft", "scheduled", "posted", "failed"];
 let currentTab = "draft";
 let paused = false;
 
@@ -276,6 +283,7 @@ function fmtFull(iso) {
 }
 
 function cardHeading(n) {
+  if (n.status === "scheduled") return `Scheduled <span>·</span> ${fmtFull(n.scheduled_at)}`;
   if (n.status === "posted" && n.posted_at) return `Posted <span>·</span> ${fmtFull(n.posted_at)}`;
   if (n.status === "failed") return `Drafted ${fmtFull(n.created_at)} <span>· post attempt failed</span>`;
   return `Drafted <span>·</span> ${fmtFull(n.created_at)}`;
@@ -309,16 +317,23 @@ async function load() {
   });
 }
 
+function renderUrls(n) {
+  if (!n.post_urls) return "";
+  let u = {};
+  try { u = JSON.parse(n.post_urls); } catch { return ""; }
+  const parts = Object.entries(u).map(([p, v]) => {
+    if (typeof v === "string" && v.startsWith("scheduled:")) {
+      return `<span style="color:var(--muted)">${p}: scheduled ${fmtLocal(v.slice(10))}</span>`;
+    }
+    return `<a href="${esc(v)}" target="_blank">${p}</a>`;
+  });
+  return `<div class="posted-links">${parts.join(" · ")}</div>`;
+}
+
 function renderCard(n) {
-  const editable = ["draft", "approved", "failed"].includes(n.status);
+  const editable = ["draft", "scheduled", "approved", "failed"].includes(n.status);
   const ro = editable ? "" : "readonly";
-  let urls = "";
-  if (n.post_urls) {
-    try {
-      const u = JSON.parse(n.post_urls);
-      urls = `<div class="posted-links">${Object.entries(u).map(([p, url]) => `<a href="${esc(url)}" target="_blank">${p}</a>`).join(" · ")}</div>`;
-    } catch {}
-  }
+  const urls = renderUrls(n);
   return `
   <div class="card" id="card-${n.id}">
     <div class="meta">
@@ -357,6 +372,12 @@ function renderCard(n) {
       ${REVIEW_ENABLED ? `<button class="btn-reject" onclick="review(${n.id}, 'reject')">Reject</button>` : ""}
       <button class="btn-reject" onclick="delNote(${n.id})">Delete</button>
     </div>
+    ${!REVIEW_ENABLED ? `
+    <div class="schedule-row">
+      <span class="schedule-label">Or schedule for</span>
+      <input type="datetime-local" id="when-${n.id}" ${n.scheduled_at ? `value="${toLocalInput(n.scheduled_at)}"` : ""}>
+      <button class="btn-schedule" onclick="scheduleNow(${n.id})">${n.status === "scheduled" ? "Reschedule" : "Schedule"}</button>
+    </div>` : ""}
     <div class="card-status" id="cstat-${n.id}"></div>` : ""}
     ${n.error ? `<div class="error-line">${esc(n.error)}</div>` : ""}
     ${urls}
@@ -396,6 +417,36 @@ async function save(id) {
     await call("update_note", { token: token(), id, ...collectEdits(id) });
     setCardStatus(id, `Saved`, "ok");
   } catch (e) { setCardStatus(id, e.message, "err"); }
+}
+
+function toLocalInput(iso) {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+async function scheduleNow(id) {
+  const w = document.getElementById(`when-${id}`).value;
+  if (!w) { setCardStatus(id, "Pick a date and time first.", "err"); return; }
+  const iso = new Date(w).toISOString();
+  if (new Date(iso).getTime() < Date.now()) { setCardStatus(id, "That time is in the past.", "err"); return; }
+  const wantsSubstack = document.getElementById(`ps-${id}`)?.checked;
+  // Open the Substack tab now (user gesture) so JT can hand off the Substack half.
+  let substackTab = null;
+  if (wantsSubstack) substackTab = window.open("https://substack.com/home", "_blank");
+  setCardStatus(id, "Scheduling...", "busy");
+  try {
+    await call("update_note", { token: token(), id, ...collectEdits(id) });
+    await call("schedule_note", { token: token(), id, scheduled_at: iso });
+    let msg = `Note #${id} scheduled for ${new Date(iso).toLocaleString()}.`;
+    if (wantsSubstack) msg += " Substack half: click your ZHG bookmarklet in the tab that just opened to hand it to Substack's scheduler.";
+    setStatus(msg, "ok");
+    load();
+  } catch (e) {
+    if (substackTab) try { substackTab.close(); } catch (_) {}
+    setCardStatus(id, e.message, "err");
+  }
 }
 
 async function postNow(id) {
