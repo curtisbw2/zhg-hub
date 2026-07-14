@@ -1,4 +1,5 @@
 name = "zhg-hub-worker"
+account_id = "62ee211bd2a024e1cc8a66f33813d56f"
 main = "src/index.js"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
