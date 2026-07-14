@@ -194,13 +194,14 @@
     <div class="meta"><span>Substack poster (bookmarklet)</span></div>
     <p style="font-size:13px;color:var(--muted);line-height:1.5;margin-bottom:10px">
       Substack blocks posting from servers, so Substack halves post through your own browser.
-      Drag the button below to your bookmarks bar once. Then, whenever a note says
-      "Substack pending": open substack.com (logged in) and click the bookmark. It posts
-      every pending Substack note and reports back to this queue.
+      <strong style="color:var(--text)">Setup (once):</strong> press Ctrl+Shift+B to show the bookmarks bar, then drag the button below onto it.
+      <br><br>
+      <strong style="color:var(--text)">Use:</strong> after clicking Post now on a note, a Substack tab opens automatically.
+      Click the bookmark there and a panel appears listing every note awaiting Substack. Tick the ones you want and post them.
     </p>
-    <a href="javascript:(async()=>{if(location.hostname!=='substack.com'){alert('Open substack.com first, then click this bookmark.');return;}const HUB='https://zhg-hub-worker.zerohourgroup.workers.dev/mcp';let T=localStorage.getItem('zhg_queue_token')||prompt('ZHG queue token:');if(!T)return;localStorage.setItem('zhg_queue_token',T);const rpc=(tool,params)=>fetch(HUB,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:tool,params:params})}).then(r=>r.json());const q=await rpc('get_queue',{status:'failed'});const pend=(q.results||[]).filter(n=>n.platforms.includes('substack')&&!(n.post_urls&&JSON.parse(n.post_urls).substack));if(!pend.length){alert('No pending Substack notes.');return;}if(!confirm('Post '+pend.length+' note(s) to Substack now?\n\n'+pend.map(n=>'#'+n.id+': '+n.body.slice(0,60)).join('\n')))return;let done=0,fail=0,msgs=[];for(const n of pend){const text=n.body_substack||n.body;const bodyJson={type:'doc',attrs:{schemaVersion:'v1'},content:text.split(/\n+/).map(p=>p.trim()).filter(Boolean).map(p=>({type:'paragraph',content:[{type:'text',text:p}]}))};try{const r=await fetch('https://substack.com/api/v1/comment/feed',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({bodyJson:bodyJson,tabId:'for-you',surface:'feed',replyMinimumRole:'everyone'})});const d=await r.json();if(!r.ok||!d.id)throw new Error('HTTP '+r.status);const h=d.user&&d.user.handle?'@'+d.user.handle+'/':'';const url='https://substack.com/'+h+'note/c-'+d.id;const m=await rpc('mark_posted',{token:T,id:n.id,platform:'substack',url:url});if(m.error)throw new Error(m.error);done++;msgs.push('#'+n.id+' posted');}catch(e){fail++;msgs.push('#'+n.id+' FAILED: '+e.message);}}alert('Done. '+done+' posted, '+fail+' failed.\n'+msgs.join('\n'));})();"
+    <a href="javascript:(async()=>{const HUB='https://zhg-hub-worker.zerohourgroup.workers.dev/mcp';if(location.hostname.indexOf('substack.com')===-1){alert('Open substack.com (logged in) first, then click this bookmark.');return;}if(document.getElementById('zhgPanel')){document.getElementById('zhgPanel').remove();}let T=localStorage.getItem('zhg_queue_token')||prompt('ZHG queue token:');if(!T)return;localStorage.setItem('zhg_queue_token',T);const rpc=(t,p)=>fetch(HUB,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({tool:t,params:p})}).then(r=>r.json());const q=await rpc('get_queue',{limit:200});const pend=(q.results||[]).filter(n=>{if(n.platforms.indexOf('substack')===-1)return false;if(n.status!=='failed')return false;let u={};try{u=n.post_urls?JSON.parse(n.post_urls):{};}catch(e){}return !u.substack;});const P=document.createElement('div');P.id='zhgPanel';P.style.cssText='position:fixed;top:20px;right:20px;width:400px;max-height:75vh;overflow-y:auto;background:#111;border:1px solid #FF6B00;border-radius:8px;color:#fff;padding:16px;z-index:999999;font-family:-apple-system,Segoe UI,Roboto,sans-serif;font-size:13px;box-shadow:0 8px 32px rgba(0,0,0,.6)';const H=document.createElement('div');H.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:12px';const HT=document.createElement('div');HT.textContent='ZHG - Substack';HT.style.cssText='font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#FF6B00;font-size:12px';const HX=document.createElement('div');HX.textContent='X';HX.style.cssText='cursor:pointer;color:#999;font-size:12px';HX.onclick=()=>P.remove();H.appendChild(HT);H.appendChild(HX);P.appendChild(H);if(!pend.length){const E=document.createElement('div');E.textContent='No notes awaiting Substack. Click Post now on the ZHG Notes page first.';E.style.cssText='color:#999;line-height:1.5';P.appendChild(E);document.body.appendChild(P);return;}const boxes=[];pend.forEach(n=>{const row=document.createElement('label');row.style.cssText='display:flex;gap:10px;align-items:flex-start;padding:10px;border:1px solid #2a2a2a;border-radius:6px;margin-bottom:8px;cursor:pointer;line-height:1.45';const cb=document.createElement('input');cb.type='checkbox';cb.checked=true;cb.style.cssText='margin-top:3px;flex-shrink:0';const tx=document.createElement('div');const id=document.createElement('div');id.textContent='#'+n.id;id.style.cssText='color:#FF6B00;font-weight:700;font-size:11px;margin-bottom:3px';const bd=document.createElement('div');bd.textContent=(n.body_substack||n.body).slice(0,150)+((n.body_substack||n.body).length>150?'...':'');const st=document.createElement('div');st.style.cssText='margin-top:5px;font-size:11px;color:#999';tx.appendChild(id);tx.appendChild(bd);tx.appendChild(st);row.appendChild(cb);row.appendChild(tx);P.appendChild(row);boxes.push({n:n,cb:cb,st:st});});const B=document.createElement('button');B.textContent='Post selected to Substack';B.style.cssText='width:100%;background:#FF6B00;color:#000;border:none;border-radius:6px;padding:12px;font-weight:700;font-size:12px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;margin-top:4px';B.onclick=async()=>{const sel=boxes.filter(b=>b.cb.checked);if(!sel.length){alert('Nothing selected.');return;}B.disabled=true;B.textContent='Posting...';for(const b of sel){b.st.textContent='Posting...';b.st.style.color='#FF6B00';const text=b.n.body_substack||b.n.body;const bodyJson={type:'doc',attrs:{schemaVersion:'v1'},content:text.split(/\n+/).map(p=>p.trim()).filter(Boolean).map(p=>({type:'paragraph',content:[{type:'text',text:p}]}))};try{const r=await fetch('https://substack.com/api/v1/comment/feed',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify({bodyJson:bodyJson,tabId:'for-you',surface:'feed',replyMinimumRole:'everyone'})});const d=await r.json();if(!r.ok||!d.id)throw new Error('Substack HTTP '+r.status);const prof=d.user&amp;&amp;d.user.id&amp;&amp;d.user.name?'profile/'+d.user.id+'-'+d.user.name.toLowerCase().replace(/[^a-z0-9]+/g,'-')+'/':'';const url='https://substack.com/'+prof+'note/c-'+d.id;const m=await rpc('mark_posted',{token:T,id:b.n.id,platform:'substack',url:url});if(m.error)throw new Error(m.error);b.st.textContent='Posted';b.st.style.color='#4ade80';b.cb.checked=false;b.cb.disabled=true;}catch(e){b.st.textContent='Failed: '+e.message;b.st.style.color='#f87171';}}B.disabled=false;B.textContent='Post selected to Substack';};P.appendChild(B);document.body.appendChild(P);})();"
        class="btn-save" style="display:inline-block;text-decoration:none;border:1px solid var(--accent);color:var(--accent);border-radius:6px;padding:10px 18px;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase"
-       onclick="alert('Drag this button to your bookmarks bar instead of clicking it here.');return false;">ZHG &rarr; Substack</a>
+       onclick="alert(String.fromCharCode(68,114,97,103) + ' this button to your bookmarks bar instead of clicking it here.');return false;">ZHG &rarr; Substack</a>
   </div>
 </div>
 
@@ -401,17 +402,25 @@ async function save(id) {
 async function postNow(id) {
   if (!confirm(`Post note #${id} to its platforms now? This goes live immediately.`)) return;
   setCardStatus(id, "Posting...", "busy");
+
+  // Substack must be posted from a logged-in browser tab. Open it now, while we
+  // still have the user gesture, so the popup blocker allows it.
+  let substackTab = null;
+  if (document.getElementById(`ps-${id}`)?.checked) {
+    substackTab = window.open('https://substack.com/home', '_blank');
+  }
   try {
     await call("update_note", { token: token(), id, ...collectEdits(id) });
     const res = await call("post_note", { token: token(), id });
     if (res.errors) {
       const posted = Object.keys(res.post_urls || {}).map((p) => `${p} posted`).join(", ");
       let msg = (posted ? posted + ". " : "") + "Failed: " + Object.keys(res.errors).join(", ") + ".";
-      if (res.errors.substack) msg += " Substack posts from your browser: open substack.com and click the ZHG bookmarklet (see bottom of this page).";
+      if (res.errors.substack) msg += " Substack is waiting in the tab that just opened: click your ZHG bookmarklet there, tick this note, and post.";
       setStatus(msg, "err");
       load();
       return;
     }
+    if (substackTab) try { substackTab.close(); } catch (e) {}
     const links = Object.values(res.post_urls || {}).join("  ");
     setStatus(`Note #${id} posted. ${links}`, "ok");
     load();
